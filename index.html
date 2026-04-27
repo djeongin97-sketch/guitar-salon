@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>김해기타살롱 연습실 예약</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+
+  <link rel="icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+
+  <!-- 홈 화면 -->
+  <div id="screen-home">
+    <div class="home-guitar">🎸</div>
+    <div class="home-title">
+      김해<span class="highlight">기타살롱</span><br>연습실 예약
+    </div>
+    <div class="home-sub">연습실을 예약하고<br>현황을 확인하세요</div>
+    <div class="home-buttons">
+      <button class="btn-home-primary" onclick="goToApp('book')">예약하기</button>
+      <button class="btn-home-secondary" onclick="goToApp('status')">예약 현황 보기</button>
+    </div>
+    <div class="home-date" id="homeDate"></div>
+  </div>
+
+  <!-- 앱 화면 -->
+  <div id="screen-app">
+
+    <header>
+      <button class="back-btn" onclick="goHome()">←</button>
+      <div class="logo">김해<span style="color:var(--accent2)">기타살롱</span></div>
+      <div class="header-date" id="headerDate"></div>
+    </header>
+
+    <main>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('book')">예약하기</button>
+        <button class="tab" onclick="switchTab('status')">예약 현황</button>
+      </div>
+
+      <!-- 예약하기 -->
+      <div class="section active" id="section-book">
+        <div class="section-label">방 선택</div>
+        <div class="room-grid" id="roomGrid"></div>
+        <div class="divider"></div>
+
+        <div class="form-group">
+          <label>이름</label>
+          <input type="text" id="inputName" placeholder="이름을 입력하세요">
+        </div>
+
+        <div class="form-group">
+          <label>사용 인원</label>
+          <select id="inputPeople">
+            <option value="">인원 선택</option>
+            <option value="1">1명</option>
+            <option value="2">2명</option>
+            <option value="3">3명</option>
+            <option value="4">4명</option>
+            <option value="5">5명 이상</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>날짜 선택</label>
+          <div class="calendar-wrap">
+            <div class="cal-header">
+              <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+              <span class="cal-title" id="calTitle"></span>
+              <button class="cal-nav" onclick="changeMonth(1)">›</button>
+            </div>
+            <div class="cal-weekdays">
+              <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+          <div class="selected-date-display" id="selectedDateDisplay"></div>
+        </div>
+
+        <div class="form-group">
+          <label>사용 시간</label>
+          <div class="time-row">
+            <input type="time" id="inputStart" value="10:00">
+            <span class="time-sep">—</span>
+            <input type="time" id="inputEnd" value="11:00">
+          </div>
+        </div>
+
+        <button class="btn-primary" onclick="submitBooking()">예약하기</button>
+      </div>
+
+      <!-- 예약 현황 -->
+      <div class="section" id="section-status">
+        <div class="status-header">
+          <div class="status-title">오늘의 예약</div>
+          <div class="total-badge">총 <b id="totalCount">0</b>팀</div>
+        </div>
+        <div class="room-filter" id="roomFilter"></div>
+        <div class="booking-list" id="bookingList"></div>
+      </div>
+
+    </main>
+  </div><!-- /screen-app -->
+
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
