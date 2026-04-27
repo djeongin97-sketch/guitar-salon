@@ -168,7 +168,6 @@ function submitBooking() {
   const people = document.getElementById('inputPeople').value;
   const start = document.getElementById('inputStart').value;
   const end = document.getElementById('inputEnd').value;
-  const password = document.getElementById('inputPassword').value.trim(); // 🟢 비밀번호 가져오기
 
   if (!selectedRoom) return showToast('방을 선택해주세요', '#b84a36');
   if (!selectedDate) return showToast('날짜를 선택해주세요', '#b84a36');
@@ -176,7 +175,6 @@ function submitBooking() {
   if (!people) return showToast('인원을 선택해주세요', '#b84a36');
   if (!start || !end) return showToast('시간을 입력해주세요', '#b84a36');
   if (start >= end) return showToast('종료 시간을 확인해주세요', '#b84a36');
-  if (!password) return showToast('비밀번호를 입력해주세요', '#b84a36'); // 🟢 비밀번호 안 쓰면 막기
 
   const conflict = bookings.find(b =>
     b.roomId === selectedRoom &&
@@ -192,16 +190,15 @@ function submitBooking() {
     people,
     start,
     end,
-    password, // 🟢 파이어베이스에 비밀번호도 같이 저장!
     createdAt: new Date().toISOString()
   };
 
+  // 기존 로컬스토리지 저장 대신 DB에 업로드!
   db.collection("bookings").add(booking).then(() => {
     selectedRoom = null;
     selectedDate = null;
     document.getElementById('inputName').value = '';
     document.getElementById('inputPeople').value = '';
-    document.getElementById('inputPassword').value = ''; // 🟢 입력칸 초기화
     document.getElementById('selectedDateDisplay').classList.remove('show');
     renderCalendar();
     
@@ -213,26 +210,70 @@ function submitBooking() {
   });
 }
 
+function renderStatus() {
+  const list = document.getElementById('bookingList');
+  const filtered = filterRoom === 'all' ? bookings : bookings.filter(b => b.roomId === parseInt(filterRoom));
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.start.localeCompare(b.start);
+  });
+
+  document.getElementById('totalCount').textContent = bookings.length;
+
+  const filterEl = document.getElementById('roomFilter');
+  filterEl.innerHTML = `
+    <button class="filter-btn ${filterRoom === 'all' ? 'active' : ''}" onclick="setFilter('all')">전체 (${bookings.length})</button>
+    ${ROOMS.map(r => {
+      const cnt = bookings.filter(b => b.roomId === r.id).length;
+      return `<button class="filter-btn ${filterRoom == r.id ? 'active' : ''}" onclick="setFilter(${r.id})">${r.name} (${cnt})</button>`;
+    }).join('')}
+  `;
+
+  if (sorted.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <div class="empty-text">예약이 없어요</div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = sorted.map(b => {
+    const room = ROOMS.find(r => r.id === b.roomId);
+    const peopleLabel = b.people === '5' ? '5명 이상' : b.people + '명';
+    const dateLabel = b.date ? (() => { const [y,m,d] = b.date.split('-'); return `${parseInt(m)}/${parseInt(d)}`; })() : '';
+    return `
+      <div class="booking-item">
+        <div class="booking-dot" style="background:${room.color}"></div>
+        <div class="booking-info">
+          <div class="booking-top">
+            <div class="booking-name">${b.name}</div>
+            <div class="booking-room">${room.name}</div>
+          </div>
+          <div class="booking-meta">
+            ${dateLabel ? `<span>📅 ${dateLabel}</span>` : ''}
+            <span>🕐 ${b.start} ~ ${b.end}</span>
+            <span>👥 ${peopleLabel}</span>
+          </div>
+        </div>
+        <button class="booking-delete" onclick="deleteBooking('${b.dbId}')" title="삭제">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function setFilter(val) {
+  filterRoom = val;
+  renderStatus();
+}
+
 /* =====================
    🔥 파이어베이스에서 예약 삭제하기
 ===================== */
 function deleteBooking(dbId) {
-  // 1. 삭제하려는 예약 데이터 찾기
-  const targetBooking = bookings.find(b => b.dbId === dbId);
-  if (!targetBooking) return;
-
-  // 2. 팝업창으로 비밀번호 물어보기
-  const inputPw = prompt('예약을 삭제하려면 비밀번호 4자리를 입력해주세요.\n(운영진은 마스터 비밀번호 입력)');
-  if (inputPw === null) return; // 사용자가 취소 버튼을 누른 경우
-
-  // 3. 비밀번호 확인하기 (🟢 "0000" 부분을 원하는 마스터 비밀번호로 바꾸세요!)
-  const MASTER_PW = "0000"; 
+  if (!confirm('예약을 취소할까요?')) return;
   
-  if (inputPw !== targetBooking.password && inputPw !== MASTER_PW) {
-    return showToast('비밀번호가 일치하지 않습니다.', '#b84a36');
-  }
-
-  // 4. 비밀번호가 맞으면 파이어베이스에서 삭제!
+  // 파이어베이스 데이터베이스에서 해당 문서(예약) 삭제!
   db.collection("bookings").doc(dbId).delete().then(() => {
     showToast('예약이 취소됐어요', '#fb923c');
   }).catch((error) => {
