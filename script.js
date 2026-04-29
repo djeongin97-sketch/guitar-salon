@@ -16,9 +16,9 @@ const db = firebase.firestore();
    방 목록
 ===================== */
 const ROOMS = [
-  { id: 1, name: '거실',   color: '#a0622a', desc: '최대 2팀' },
-  { id: 2, name: '작은방', color: '#7a9e4a', desc: '최대 1팀' },
-  { id: 3, name: '보컬방', color: '#c8854a', desc: '개인만 · 수요일 불가' },
+  { id: 1, name: '거실',   color: '#a0622a', desc: '최대 2팀', maxTeams: 2 },
+  { id: 2, name: '작은방', color: '#7a9e4a', desc: '최대 1팀', maxTeams: 1 },
+  { id: 3, name: '보컬방', color: '#c8854a', desc: '개인만 · 수요일 불가', maxTeams: 1 },
 ];
 
 let bookings      = [];
@@ -134,7 +134,9 @@ function renderCalendar() {
 
 function selectDate(dateStr) {
   selectedDate = dateStr;
+  selectedRoom = null; // 날짜 바뀌면 방 선택 초기화
   renderCalendar();
+  renderRooms();
   const [y, m, d] = dateStr.split('-');
   const disp = document.getElementById('selectedDateDisplay');
   disp.textContent = `📅 ${y}년 ${parseInt(m)}월 ${parseInt(d)}일 선택됨`;
@@ -154,21 +156,37 @@ function changeMonth(dir) {
 function renderRooms() {
   const grid = document.getElementById('roomGrid');
   grid.innerHTML = ROOMS.map(r => {
-    const count = bookings.filter(b => b.roomId === r.id).length;
+    // 선택된 날짜 기준으로 해당 방 예약 수 계산
+    const dateToCheck = selectedDate || new Date().toISOString().slice(0, 10);
+    const count = bookings.filter(b => b.roomId === r.id && b.date === dateToCheck).length;
+    const isFull = count >= r.maxTeams;
+    const isSelected = selectedRoom === r.id;
+
+    // 마감된 방은 선택 불가
+    const clickHandler = isFull ? '' : `onclick="selectRoom(${r.id})"`;
+    const cardClass = `room-card ${isSelected ? 'selected' : ''} ${isFull ? 'room-full' : ''}`;
+    const badge = isFull
+      ? `<div class="room-badge badge-full">마감</div>`
+      : `<div class="room-badge badge-available">예약 가능</div>`;
+
     return `
-      <div class="room-card ${selectedRoom === r.id ? 'selected' : ''}" onclick="selectRoom(${r.id})">
+      <div class="${cardClass}" ${clickHandler}>
         <div class="room-dot" style="background:${r.color}"></div>
         <div class="room-info">
           <div class="room-name">${r.name}</div>
           <div class="room-count">${count}팀 예약 · ${r.desc}</div>
         </div>
-        <div class="room-badge badge-available">예약 가능</div>
+        ${badge}
       </div>
     `;
   }).join('');
 }
 
 function selectRoom(id) {
+  const r = ROOMS.find(r => r.id === id);
+  const dateToCheck = selectedDate || new Date().toISOString().slice(0, 10);
+  const count = bookings.filter(b => b.roomId === id && b.date === dateToCheck).length;
+  if (count >= r.maxTeams) return showToast(`${r.name}은 해당 날짜에 마감됐어요`, '#c8762a');
   selectedRoom = id;
   renderRooms();
 }
@@ -240,63 +258,131 @@ async function submitBooking() {
 }
 
 /* =====================
-   현황 렌더
+   현황 렌더 (주간 뷰)
 ===================== */
+
+// 현재 주의 시작일 (월요일 기준)
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=일, 1=월
+  const diff = day === 0 ? -6 : 1 - day; // 월요일로 맞춤
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+let weekStart = getWeekStart(new Date());
+
+function getWeekDates(start) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+function formatWeekLabel(start) {
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const s = new Date(start);
+  return `${s.getMonth()+1}/${s.getDate()} ~ ${end.getMonth()+1}/${end.getDate()}`;
+}
+
+function changeWeek(dir) {
+  weekStart.setDate(weekStart.getDate() + dir * 7);
+  renderStatus();
+}
+
 function renderStatus() {
   const list = document.getElementById('bookingList');
+  const weekDates = getWeekDates(weekStart);
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 이번 주 예약만 필터
+  const weekBookings = bookings.filter(b => weekDates.includes(b.date));
   const filtered = filterRoom === 'all'
-    ? bookings
-    : bookings.filter(b => b.roomId === parseInt(filterRoom));
-  const sorted = [...filtered].sort((a, b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return a.start.localeCompare(b.start);
-  });
+    ? weekBookings
+    : weekBookings.filter(b => b.roomId === parseInt(filterRoom));
 
+  // 헤더 업데이트
   document.getElementById('totalCount').textContent = bookings.length;
+  document.getElementById('weekLabel').textContent = formatWeekLabel(weekStart);
 
+  // 이전 주 버튼 활성/비활성 (오늘이 포함된 주보다 이전은 막기)
+  const thisWeekStart = getWeekStart(new Date());
+  document.getElementById('btnPrevWeek').style.opacity =
+    weekStart <= thisWeekStart ? '0.3' : '1';
+  document.getElementById('btnPrevWeek').disabled = weekStart <= thisWeekStart;
+
+  // 방 필터 버튼
   const filterEl = document.getElementById('roomFilter');
   filterEl.innerHTML = `
-    <button class="filter-btn ${filterRoom === 'all' ? 'active' : ''}" onclick="setFilter('all')">전체 (${bookings.length})</button>
+    <button class="filter-btn ${filterRoom === 'all' ? 'active' : ''}" onclick="setFilter('all')">전체 (${weekBookings.length})</button>
     ${ROOMS.map(r => {
-      const cnt = bookings.filter(b => b.roomId === r.id).length;
+      const cnt = weekBookings.filter(b => b.roomId === r.id).length;
       return `<button class="filter-btn ${filterRoom == r.id ? 'active' : ''}" onclick="setFilter(${r.id})">${r.name} (${cnt})</button>`;
     }).join('')}
   `;
 
-  if (sorted.length === 0) {
+  if (filtered.length === 0) {
     list.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">📭</div>
-        <div class="empty-text">예약이 없어요</div>
+        <div class="empty-text">이번 주 예약이 없어요</div>
       </div>`;
     return;
   }
 
-  list.innerHTML = sorted.map(b => {
-    const room = ROOMS.find(r => r.id === b.roomId);
-    if (!room) return '';
-    const peopleLabel = b.people === '5' ? '5명 이상' : b.people + '명';
-    const dateLabel = b.date
-      ? (() => { const [y,m,d] = b.date.split('-'); return `${parseInt(m)}/${parseInt(d)}`; })()
-      : '';
-    return `
-      <div class="booking-item">
-        <div class="booking-dot" style="background:${room.color}"></div>
-        <div class="booking-info">
-          <div class="booking-top">
-            <div class="booking-name">${b.name}</div>
-            <div class="booking-room">${room.name}</div>
-          </div>
-          <div class="booking-meta">
-            ${dateLabel ? `<span>📅 ${dateLabel}</span>` : ''}
-            <span>🕐 ${b.start} ~ ${b.end}</span>
-            <span>👥 ${peopleLabel}</span>
-          </div>
+  // 날짜별로 그룹핑
+  const DOW = ['일','월','화','수','목','금','토'];
+  let html = '';
+  weekDates.forEach(dateStr => {
+    const dayBookings = filtered
+      .filter(b => b.date === dateStr)
+      .sort((a, b) => a.start.localeCompare(b.start));
+    if (dayBookings.length === 0) return;
+
+    const d = new Date(dateStr);
+    const isToday = dateStr === today;
+    const dow = DOW[d.getDay()];
+    const [y, m, day] = dateStr.split('-');
+
+    html += `
+      <div class="day-group">
+        <div class="day-label ${isToday ? 'day-today' : ''}">
+          ${parseInt(m)}월 ${parseInt(day)}일 (${dow})
+          ${isToday ? '<span class="today-tag">오늘</span>' : ''}
         </div>
-        <button class="booking-delete" onclick="deleteBooking('${b.firestoreId}', '${b.password}')" title="삭제">✕</button>
+        ${dayBookings.map(b => {
+          const room = ROOMS.find(r => r.id === b.roomId);
+          if (!room) return '';
+          const peopleLabel = b.people === '5' ? '5명 이상' : b.people + '명';
+          return `
+            <div class="booking-item">
+              <div class="booking-dot" style="background:${room.color}"></div>
+              <div class="booking-info">
+                <div class="booking-top">
+                  <div class="booking-name">${b.name}</div>
+                  <div class="booking-room">${room.name}</div>
+                </div>
+                <div class="booking-meta">
+                  <span>🕐 ${b.start} ~ ${b.end}</span>
+                  <span>👥 ${peopleLabel}</span>
+                </div>
+              </div>
+              <button class="booking-delete" onclick="deleteBooking('${b.firestoreId}', '${b.password}')" title="삭제">✕</button>
+            </div>
+          `;
+        }).join('')}
       </div>
     `;
-  }).join('');
+  });
+
+  list.innerHTML = html || `
+    <div class="empty-state">
+      <div class="empty-icon">📭</div>
+      <div class="empty-text">이번 주 예약이 없어요</div>
+    </div>`;
 }
 
 function setFilter(val) {

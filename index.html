@@ -6,11 +6,6 @@
   <title>김해기타살롱 연습실 예약</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <link rel="manifest" href="manifest.json">
-
-  <link rel="icon" href="favicon.ico">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
 <body>
 
@@ -102,8 +97,14 @@
       <!-- 예약 현황 -->
       <div class="section" id="section-status">
         <div class="status-header">
-          <div class="status-title">오늘의 예약</div>
+          <div class="status-title">예약 현황</div>
           <div class="total-badge">총 <b id="totalCount">0</b>팀</div>
+        </div>
+        <!-- 주간 네비게이션 -->
+        <div class="week-nav">
+          <button class="week-btn" id="btnPrevWeek" onclick="changeWeek(-1)">‹</button>
+          <span class="week-label" id="weekLabel"></span>
+          <button class="week-btn" onclick="changeWeek(1)">›</button>
         </div>
         <div class="room-filter" id="roomFilter"></div>
         <div class="booking-list" id="bookingList"></div>
@@ -127,9 +128,8 @@
     </div>
   </div>
 
-  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
-
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

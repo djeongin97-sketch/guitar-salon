@@ -128,6 +128,14 @@ main {
   border-radius: 20px;
   font-weight: 500;
 }
+.room-card.room-full {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.room-card.room-full:hover {
+  border-color: var(--border);
+  transform: none;
+}
 .badge-available { background: #ddf0dd; color: var(--success); }
 .badge-full { background: #f5ddd8; color: var(--danger); }
 
@@ -214,6 +222,7 @@ select option { background: var(--surface2); }
   gap: 12px;
   align-items: flex-start;
   animation: slideIn 0.3s ease;
+  margin-bottom: 5px; /* 이 부분을 추가하여 간격을 띄웁니다 */
 }
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -402,6 +411,63 @@ select option { background: var(--surface2); }
   transition: all 0.2s;
 }
 .modal-btn-confirm:hover { opacity: 0.85; }
+
+/* =====================
+   WEEK NAV
+===================== */
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+}
+.week-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+}
+.week-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+  line-height: 1;
+}
+.week-btn:hover { background: var(--surface2); color: var(--accent); }
+
+/* =====================
+   DAY GROUP
+===================== */
+.day-group { margin-bottom: 16px; }
+.day-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  padding: 6px 4px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.day-label.day-today { color: var(--accent); }
+.today-tag {
+  font-size: 10px;
+  background: var(--accent);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 20px;
+  font-weight: 600;
+}
 
 /* =====================
    SECTION LABEL / DIVIDER
