@@ -16,9 +16,9 @@ const db = firebase.firestore();
    방 목록
 ===================== */
 const ROOMS = [
-  { id: 1, name: '거실',   color: '#a0622a', desc: '최대 2팀', maxTeams: 2 },
-  { id: 2, name: '작은방', color: '#7a9e4a', desc: '최대 1팀', maxTeams: 1 },
-  { id: 3, name: '보컬방', color: '#c8854a', desc: '개인만 · 수요일 불가', maxTeams: 1 },
+  { id: 1, name: '거실',   color: '#a0622a', desc: '최대 12인', maxPeople: 12 },
+  { id: 2, name: '작은방', color: '#7a9e4a', desc: '최대 6인', maxPeople: 6 },
+  { id: 3, name: '보컬방', color: '#c8854a', desc: '최대 2인 · 수요일 불가', maxPeople: 2 },
 ];
 
 let bookings      = [];
@@ -156,39 +156,68 @@ function changeMonth(dir) {
 function renderRooms() {
   const grid = document.getElementById('roomGrid');
   grid.innerHTML = ROOMS.map(r => {
-    // 선택된 날짜 기준으로 해당 방 예약 수 계산
     const dateToCheck = selectedDate || new Date().toISOString().slice(0, 10);
-    const count = bookings.filter(b => b.roomId === r.id && b.date === dateToCheck).length;
-    const isFull = count >= r.maxTeams;
-    const isSelected = selectedRoom === r.id;
+    
+    // 해당 날짜, 해당 방의 전체 인원수 합산
+    const roomBookings = bookings.filter(b => b.roomId === r.id && b.date === dateToCheck);
+    const totalPeople = roomBookings.reduce((sum, b) => sum + parseInt(b.people || 0), 0);
 
-    // 마감된 방은 선택 불가
-    const clickHandler = isFull ? '' : `onclick="selectRoom(${r.id})"`;
-    const cardClass = `room-card ${isSelected ? 'selected' : ''} ${isFull ? 'room-full' : ''}`;
-    const badge = isFull
-      ? `<div class="room-badge badge-full">마감</div>`
-      : `<div class="room-badge badge-available">예약 가능</div>`;
+    const isSelected = selectedRoom === r.id;
+    const clickHandler = `onclick="selectRoom(${r.id})"`;
+    const cardClass = `room-card ${isSelected ? 'selected' : ''}`;
 
     return `
       <div class="${cardClass}" ${clickHandler}>
         <div class="room-dot" style="background:${r.color}"></div>
         <div class="room-info">
           <div class="room-name">${r.name}</div>
-          <div class="room-count">${count}팀 예약 · ${r.desc}</div>
+          <div class="room-count">오늘 총 ${totalPeople}명 예약 · ${r.desc}</div>
         </div>
-        ${badge}
+        <div class="room-badge badge-available">예약 가능</div>
       </div>
     `;
   }).join('');
 }
 
+/* =====================
+   방 선택 (누락되었던 함수 추가)
+===================== */
 function selectRoom(id) {
-  const r = ROOMS.find(r => r.id === id);
-  const dateToCheck = selectedDate || new Date().toISOString().slice(0, 10);
-  const count = bookings.filter(b => b.roomId === id && b.date === dateToCheck).length;
-  if (count >= r.maxTeams) return showToast(`${r.name}은 해당 날짜에 마감됐어요`, '#c8762a');
   selectedRoom = id;
+  const typeGroup = document.getElementById('typeGroup');
+  const inputType = document.getElementById('inputType');
+
+  if (typeGroup && inputType) {
+    typeGroup.style.display = 'block';
+    
+    if (id === 3) {
+      // 보컬방(id: 3)일 경우 '개인'으로 고정하고 선택 불가 처리
+      inputType.value = '개인';
+      inputType.disabled = true;
+    } else {
+      // 다른 방(거실, 작은방)을 누르면 기본값을 '팀'으로 되돌리고 선택 가능하게 변경
+      inputType.value = '팀';      // 👈 이 줄이 추가되었습니다!
+      inputType.disabled = false;
+    }
+    // 👉 예약 유형이 세팅된 직후에 인원수 조절 함수도 같이 실행!
+    handleTypeChange();
+  }
   renderRooms();
+}
+
+/* =====================
+   예약 유형 변경 시 인원수 조절
+===================== */
+function handleTypeChange() {
+  const type = document.getElementById('inputType').value;
+  const peopleSelect = document.getElementById('inputPeople');
+
+  if (type === '개인') {
+    peopleSelect.value = '1';       // 1명으로 자동 변경
+    peopleSelect.disabled = true;   // 다른 인원 선택 못 하게 잠금
+  } else {
+    peopleSelect.disabled = false;  // 팀 연습일 때는 다시 잠금 해제
+  }
 }
 
 /* =====================
@@ -208,10 +237,13 @@ function switchTab(tab) {
 ===================== */
 async function submitBooking() {
   const name     = document.getElementById('inputName').value.trim();
-  const people   = document.getElementById('inputPeople').value;
+  const people   = document.getElementById('inputPeople').value; // 선택한 인원수 (1~5)
   const start    = document.getElementById('inputStart').value;
   const end      = document.getElementById('inputEnd').value;
   const password = document.getElementById('inputPassword').value.trim();
+  
+  // 모든 방에서 팀/개인 값 가져오기
+  const practiceType = document.getElementById('inputType') ? document.getElementById('inputType').value : '';
 
   if (!selectedRoom)                    return showToast('방을 선택해주세요', '#b84a36');
   if (!selectedDate)                    return showToast('날짜를 선택해주세요', '#b84a36');
@@ -221,14 +253,23 @@ async function submitBooking() {
   if (start >= end)                     return showToast('종료 시간을 확인해주세요', '#b84a36');
   if (!password || password.length < 4) return showToast('비밀번호 4자리를 입력해주세요', '#b84a36');
 
-  const conflict = bookings.find(b =>
+  // --- [핵심 로직] 예약하려는 시간과 겹치는 기존 예약들의 인원수 합산 ---
+  const r = ROOMS.find(r => r.id === selectedRoom);
+  const addPeople = parseInt(people); // 5명 이상은 5명으로 계산됨
+  
+  const overlappingBookings = bookings.filter(b => 
     b.roomId === selectedRoom &&
-    b.date   === selectedDate &&
-    !(end <= b.start || start >= b.end)
+    b.date === selectedDate &&
+    !(end <= b.start || start >= b.end) // 시간이 조금이라도 겹치면 포함
   );
-  if (conflict) return showToast(
-    `${ROOMS.find(r => r.id === selectedRoom).name}은 해당 시간에 이미 예약이 있어요`, '#c8762a'
-  );
+
+  const overlappingPeople = overlappingBookings.reduce((sum, b) => sum + parseInt(b.people || 0), 0);
+
+  // 현재 겹치는 시간에 새 인원을 추가했을 때 최대 인원을 초과하면 예약 차단
+  if (overlappingPeople + addPeople > r.maxPeople) {
+    return showToast(`해당 시간에는 남은 자리가 부족해요 (현재 ${overlappingPeople}명 예약됨 / 최대 ${r.maxPeople}명)`, '#c8762a');
+  }
+  // -----------------------------------------------------------
 
   try {
     const savedDate = selectedDate;
@@ -238,6 +279,7 @@ async function submitBooking() {
       roomId: selectedRoom,
       date:   selectedDate,
       name, people, start, end, password,
+      practiceType, 
       createdAt: new Date().toISOString()
     });
 
@@ -247,6 +289,14 @@ async function submitBooking() {
     document.getElementById('inputPeople').value   = '';
     document.getElementById('inputPassword').value = '';
     document.getElementById('selectedDateDisplay').classList.remove('show');
+    
+    const typeGroup = document.getElementById('typeGroup');
+    if(typeGroup) {
+      typeGroup.style.display = 'none';
+      document.getElementById('inputType').disabled = false; // 👈 이 줄을 추가해서 잠금을 풀어줍니다.
+      document.getElementById('inputPeople').disabled = false; // 👈 이 줄을 추가해서 인원수 잠금을 풀어줍니다.
+    }
+
     renderCalendar();
 
     const [y, m, d] = savedDate.split('-');
@@ -256,6 +306,8 @@ async function submitBooking() {
     showToast('예약 저장 실패. 다시 시도해주세요', '#b84a36');
   }
 }
+
+   
 
 /* =====================
    현황 렌더 (주간 뷰)
@@ -362,7 +414,7 @@ function renderStatus() {
               <div class="booking-dot" style="background:${room.color}"></div>
               <div class="booking-info">
                 <div class="booking-top">
-                  <div class="booking-name">${b.name}</div>
+                  <div class="booking-name">${b.name}${b.practiceType ? ` <span style="font-size:12px; font-weight:500; color:var(--accent);">[${b.practiceType}]</span>` : ''}</div>
                   <div class="booking-room">${room.name}</div>
                 </div>
                 <div class="booking-meta">
