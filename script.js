@@ -28,7 +28,7 @@ let selectedDate  = null;
 let deleteTargetId = null;
 let deleteTargetPw = '';
 
-const MASTER_PASSWORD = '0000'; // 운영진 마스터 비밀번호
+const MASTER_PASSWORD = '2323'; // 운영진 마스터 비밀번호
 
 /* =====================
    공휴일
