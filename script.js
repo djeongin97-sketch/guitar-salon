@@ -1,9 +1,7 @@
 const ROOMS = [
-  { id: 1, name: '1번 방', color: '#a0622a' },
-  { id: 2, name: '2번 방', color: '#7a9e4a' },
-  { id: 3, name: '3번 방', color: '#c8854a' },
-  { id: 4, name: '4번 방', color: '#4a86a8' },
-  { id: 5, name: '5번 방', color: '#8b6914' },
+  { id: 1, name: '거실', color: '#a0622a', desc: '최대 2팀' },
+  { id: 2, name: '작은방', color: '#7a9e4a', desc: '최대 1팀' },
+  { id: 3, name: '보컬방', color: '#c8854a', desc: '개인만 · 수요일 불가' },
 ];
 
 let bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
@@ -124,7 +122,7 @@ function renderRooms() {
         <div class="room-dot" style="background:${r.color}"></div>
         <div class="room-info">
           <div class="room-name">${r.name}</div>
-          <div class="room-count">${count}팀 예약</div>
+          <div class="room-count">${count}팀 예약 · ${r.desc}</div>
         </div>
         <div class="room-badge badge-available">예약 가능</div>
       </div>
