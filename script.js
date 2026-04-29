@@ -180,28 +180,43 @@ function renderRooms() {
 }
 
 /* =====================
-   방 선택 (누락되었던 함수 추가)
+   방 선택 (동적 인원수 조절 포함)
 ===================== */
 function selectRoom(id) {
   selectedRoom = id;
   const typeGroup = document.getElementById('typeGroup');
   const inputType = document.getElementById('inputType');
+  const peopleSelect = document.getElementById('inputPeople'); // 인원수 선택창 가져오기
+  
+  const room = ROOMS.find(r => r.id === id); // 선택한 방의 정보 찾기
 
+  // 1. 방의 최대 인원에 맞춰서 인원 선택 옵션(1~max) 새로 만들기
+  if (peopleSelect && room) {
+    let optionsHtml = '<option value="">인원 선택</option>';
+    for (let i = 1; i <= room.maxPeople; i++) {
+      optionsHtml += `<option value="${i}">${i}명</option>`;
+    }
+    peopleSelect.innerHTML = optionsHtml;
+  }
+
+  // 2. 예약 유형(팀/개인) 세팅하기
   if (typeGroup && inputType) {
     typeGroup.style.display = 'block';
     
     if (id === 3) {
-      // 보컬방(id: 3)일 경우 '개인'으로 고정하고 선택 불가 처리
+      // 보컬방(id: 3)일 경우 '개인'으로 고정
       inputType.value = '개인';
       inputType.disabled = true;
     } else {
-      // 다른 방(거실, 작은방)을 누르면 기본값을 '팀'으로 되돌리고 선택 가능하게 변경
-      inputType.value = '팀';      // 👈 이 줄이 추가되었습니다!
+      // 다른 방은 기본값을 '팀'으로 세팅
+      inputType.value = '팀';
       inputType.disabled = false;
     }
-    // 👉 예약 유형이 세팅된 직후에 인원수 조절 함수도 같이 실행!
+    
+    // 예약 유형에 맞춰서 인원수(1명 고정 등) 처리 함수 실행
     handleTypeChange();
   }
+  
   renderRooms();
 }
 
@@ -310,26 +325,37 @@ async function submitBooking() {
    
 
 /* =====================
-   현황 렌더 (주간 뷰)
+   현황 렌더 (요일 탭 뷰)
 ===================== */
 
-// 현재 주의 시작일 (월요일 기준)
 function getWeekStart(date) {
   const d = new Date(date);
-  const day = d.getDay(); // 0=일, 1=월
-  const diff = day === 0 ? -6 : 1 - day; // 월요일로 맞춤
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
+// 로컬 날짜 기준 YYYY-MM-DD 반환 (UTC 버그 방지)
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 let weekStart = getWeekStart(new Date());
+let selectedDayIndex = (() => {
+  const today = new Date().getDay();
+  return today === 0 ? 6 : today - 1; // 월=0 ... 일=6
+})();
 
 function getWeekDates(start) {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
-    return d.toISOString().slice(0, 10);
+    return toLocalDateStr(d);
   });
 }
 
@@ -342,103 +368,101 @@ function formatWeekLabel(start) {
 
 function changeWeek(dir) {
   weekStart.setDate(weekStart.getDate() + dir * 7);
+  selectedDayIndex = 0;
+  renderStatus();
+}
+
+function selectDay(index) {
+  selectedDayIndex = index;
   renderStatus();
 }
 
 function renderStatus() {
   const list = document.getElementById('bookingList');
   const weekDates = getWeekDates(weekStart);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toLocalDateStr(new Date());
+  const DOW = ['월','화','수','목','금','토','일'];
 
-  // 이번 주 예약만 필터
-  const weekBookings = bookings.filter(b => weekDates.includes(b.date));
-  const filtered = filterRoom === 'all'
-    ? weekBookings
-    : weekBookings.filter(b => b.roomId === parseInt(filterRoom));
-
-  // 헤더 업데이트
-  document.getElementById('totalCount').textContent = bookings.length;
+ // document.getElementById('totalCount').textContent = bookings.length;
   document.getElementById('weekLabel').textContent = formatWeekLabel(weekStart);
-
-  // 이전 주 버튼 항상 활성화 (과거 예약도 볼 수 있게 변경)
   document.getElementById('btnPrevWeek').style.opacity = '1';
   document.getElementById('btnPrevWeek').disabled = false;
 
-  // 방 필터 버튼
+  // 요일 탭 렌더
   const filterEl = document.getElementById('roomFilter');
   filterEl.innerHTML = `
-    <button class="filter-btn ${filterRoom === 'all' ? 'active' : ''}" onclick="setFilter('all')">전체 (${weekBookings.length})</button>
-    ${ROOMS.map(r => {
-      const cnt = weekBookings.filter(b => b.roomId === r.id).length;
-      return `<button class="filter-btn ${filterRoom == r.id ? 'active' : ''}" onclick="setFilter(${r.id})">${r.name} (${cnt})</button>`;
-    }).join('')}
+    <div class="day-tabs">
+      ${weekDates.map((dateStr, i) => {
+        const isToday = dateStr === today;
+        const isPast = dateStr < today;
+        const hasBk = bookings.some(b => b.date === dateStr);
+        const [,m,day] = dateStr.split('-');
+        return `
+          <div class="day-tab ${selectedDayIndex === i ? 'active' : ''} ${isToday ? 'is-today' : ''} ${isPast ? 'is-past' : ''}" onclick="selectDay(${i})">
+            <div class="day-tab-dow">${DOW[i]}</div>
+            <div class="day-tab-date">${parseInt(day)}</div>
+            ${hasBk ? '<div class="day-tab-dot"></div>' : '<div class="day-tab-dot invisible"></div>'}
+          </div>
+        `;
+      }).join('')}
+    </div>
   `;
 
-  if (filtered.length === 0) {
-    list.innerHTML = `
+  // 선택된 날짜의 예약
+  const selectedDate = weekDates[selectedDayIndex];
+  const [,m,day] = selectedDate.split('-');
+  const isToday = selectedDate === today;
+
+  const dayBookings = bookings
+    .filter(b => b.date === selectedDate && (filterRoom === 'all' || b.roomId === parseInt(filterRoom)))
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+    // 👇 여기에 이 두 줄을 꼭 넣어주세요!
+  const totalPeople = dayBookings.reduce((sum, b) => sum + parseInt(b.people || 0), 0);
+  document.getElementById('totalCount').textContent = totalPeople;
+
+  // 날짜 헤더
+  const dateHeader = `
+    <div class="selected-day-header ${isToday ? 'day-today' : ''}">
+      ${parseInt(m)}월 ${parseInt(day)}일 (${DOW[selectedDayIndex]})
+      ${isToday ? '<span class="today-tag">오늘</span>' : ''}
+    </div>
+  `;
+
+  if (dayBookings.length === 0) {
+    list.innerHTML = dateHeader + `
       <div class="empty-state">
         <div class="empty-icon">📭</div>
-        <div class="empty-text">이번 주 예약이 없어요</div>
+        <div class="empty-text">이날 예약이 없어요</div>
       </div>`;
     return;
   }
 
-  // 날짜별로 그룹핑
-  const DOW = ['일','월','화','수','목','금','토'];
-  let html = '';
-  weekDates.forEach(dateStr => {
-    const dayBookings = filtered
-      .filter(b => b.date === dateStr)
-      .sort((a, b) => a.start.localeCompare(b.start));
-    if (dayBookings.length === 0) return;
-
-    const d = new Date(dateStr);
-    const isToday = dateStr === today;
-    const dow = DOW[d.getDay()];
-    const [y, m, day] = dateStr.split('-');
-
-    html += `
-      <div class="day-group">
-        <div class="day-label ${isToday ? 'day-today' : ''}">
-          ${parseInt(m)}월 ${parseInt(day)}일 (${dow})
-          ${isToday ? '<span class="today-tag">오늘</span>' : ''}
+  list.innerHTML = dateHeader + dayBookings.map(b => {
+    const room = ROOMS.find(r => r.id === b.roomId);
+    if (!room) return '';
+    const peopleLabel = b.people === '5' ? '5명 이상' : b.people + '명';
+    const endDateTime = new Date(`${b.date}T${b.end}:00`);
+    const isPast = endDateTime < new Date();
+    const pastClass = isPast ? 'past' : '';
+    const endBadge = isPast ? `<span style="font-size:11px;font-weight:normal;color:#888;margin-left:4px;">(종료)</span>` : '';
+    return `
+      <div class="booking-item ${pastClass}">
+        <div class="booking-dot" style="background:${room.color}"></div>
+        <div class="booking-info">
+          <div class="booking-top">
+            <div class="booking-name">${b.name}${b.practiceType ? ` <span style="font-size:12px;font-weight:500;color:var(--accent);">[${b.practiceType}]</span>` : ''}${endBadge}</div>
+            <div class="booking-room">${room.name}</div>
+          </div>
+          <div class="booking-meta">
+            <span>🕐 ${b.start} ~ ${b.end}</span>
+            <span>👥 ${peopleLabel}</span>
+          </div>
         </div>
-        ${dayBookings.map(b => {
-          const room = ROOMS.find(r => r.id === b.roomId);
-          if (!room) return '';
-          const peopleLabel = b.people === '5' ? '5명 이상' : b.people + '명';
-          // 👇 현재 시간과 예약 종료 시간을 비교하는 로직 추가
-          const endDateTime = new Date(`${b.date}T${b.end}:00`);
-          const now = new Date();
-          const isPast = endDateTime < now; // 예약 종료 시간이 현재보다 과거인지 확인
-          const pastClass = isPast ? 'past' : ''; // 과거면 'past' 클래스 추가
-          const endBadge = isPast ? `<span style="font-size:11px; font-weight:normal; color:#888; margin-left:4px;">(종료)</span>` : '';
-          return `
-           <div class="booking-item ${pastClass}">
-              <div class="booking-dot" style="background:${room.color}"></div>
-              <div class="booking-info">
-                <div class="booking-top">
-                  <div class="booking-name">${b.name}${b.practiceType ? ` <span style="font-size:12px; font-weight:500; color:var(--accent);">[${b.practiceType}]</span>` : ''}${endBadge}</div>
-                  <div class="booking-room">${room.name}</div>
-                </div>
-                <div class="booking-meta">
-                  <span>🕐 ${b.start} ~ ${b.end}</span>
-                  <span>👥 ${peopleLabel}</span>
-                </div>
-              </div>
-              <button class="booking-delete" onclick="deleteBooking('${b.firestoreId}', '${b.password}')" title="삭제">✕</button>
-            </div>
-          `;
-        }).join('')}
+        <button class="booking-delete" onclick="deleteBooking('${b.firestoreId}', '${b.password}')" title="삭제">✕</button>
       </div>
     `;
-  });
-
-  list.innerHTML = html || `
-    <div class="empty-state">
-      <div class="empty-icon">📭</div>
-      <div class="empty-text">이번 주 예약이 없어요</div>
-    </div>`;
+  }).join('');
 }
 
 function setFilter(val) {

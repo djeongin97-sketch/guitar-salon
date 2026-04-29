@@ -279,11 +279,7 @@ select option { background: var(--surface2); }
    ROOM FILTER
 ===================== */
 .room-filter {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  margin-bottom: 16px;
+  margin-bottom: 4px;
   scrollbar-width: none;
 }
 .room-filter::-webkit-scrollbar { display: none; }
@@ -445,21 +441,75 @@ select option { background: var(--surface2); }
 .week-btn:hover { background: var(--surface2); color: var(--accent); }
 
 /* =====================
-   DAY GROUP
+   DAY TABS
 ===================== */
-.day-group { margin-bottom: 16px; }
-.day-label {
-  font-size: 12px;
+.day-tabs {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.day-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: all 0.15s;
+  background: var(--surface);
+}
+.day-tab:hover { border-color: var(--accent); }
+.day-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.day-tab.is-today .day-tab-date { color: var(--accent); font-weight: 800; }
+.day-tab.active .day-tab-dow,
+.day-tab.active .day-tab-date { color: #fff; }
+.day-tab.active.is-today .day-tab-date { color: #fff; }
+.day-tab-dow {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.day-tab-date {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+}
+.day-tab-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent2);
+}
+.day-tab-dot.invisible { background: transparent; }
+.day-tab.is-past {
+  opacity: 0.4;
+}
+.day-tab.is-past .day-tab-date {
+  color: var(--text-dim);
+}
+.day-tab.active.is-past {
+  opacity: 0.7;
+}
+.day-tab.active .day-tab-dot { background: rgba(255,255,255,0.7); }
+
+.selected-day-header {
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-dim);
-  padding: 6px 4px;
-  margin-bottom: 6px;
+  padding: 8px 4px;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
   gap: 6px;
   border-bottom: 1px solid var(--border);
 }
-.day-label.day-today { color: var(--accent); }
+.selected-day-header.day-today { color: var(--accent); }
 .today-tag {
   font-size: 10px;
   background: var(--accent);
