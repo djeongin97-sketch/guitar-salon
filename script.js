@@ -1,18 +1,38 @@
+/* =====================
+   Firebase 설정
+===================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCUkKpPXgF42UZU4BKkXgLNhoT5ZggOI-I",
+  authDomain: "guitar-salon.firebaseapp.com",
+  projectId: "guitar-salon",
+  storageBucket: "guitar-salon.firebasestorage.app",
+  messagingSenderId: "848655140555",
+  appId: "1:848655140555:web:f6800e43f7676add0dbd4e"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* =====================
+   방 목록
+===================== */
 const ROOMS = [
-  { id: 1, name: '거실', color: '#a0622a', desc: '최대 2팀' },
+  { id: 1, name: '거실',   color: '#a0622a', desc: '최대 2팀' },
   { id: 2, name: '작은방', color: '#7a9e4a', desc: '최대 1팀' },
   { id: 3, name: '보컬방', color: '#c8854a', desc: '개인만 · 수요일 불가' },
 ];
 
-let bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
-let selectedRoom = null;
-let filterRoom = 'all';
-let selectedDate = null;
-let deleteTargetId = null; // 삭제 대상 예약 id
+let bookings      = [];
+let selectedRoom  = null;
+let filterRoom    = 'all';
+let selectedDate  = null;
+let deleteTargetId = null;
+let deleteTargetPw = '';
 
-const MASTER_PASSWORD = '0000'; // 운영진 마스터 비밀번호 (원하는 번호로 바꾸기)
+const MASTER_PASSWORD = '0000'; // 운영진 마스터 비밀번호
 
-// 공휴일 (간단 버전)
+/* =====================
+   공휴일
+===================== */
 const HOLIDAYS = {
   '2026-01-01': '신정',
   '2026-03-01': '삼일절',
@@ -25,15 +45,35 @@ const HOLIDAYS = {
   '2026-12-25': '성탄절',
 };
 
-// 달력 상태
-let calYear = new Date().getFullYear();
+/* =====================
+   달력 상태
+===================== */
+let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth();
 
-// 날짜
+/* =====================
+   헤더 날짜
+===================== */
 const now = new Date();
-const dateStr = now.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
-document.getElementById('headerDate').textContent = dateStr;
-document.getElementById('homeDate').textContent = dateStr;
+const todayStr = now.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+document.getElementById('headerDate').textContent = todayStr;
+document.getElementById('homeDate').textContent   = todayStr;
+
+/* =====================
+   Firestore 실시간 구독
+===================== */
+db.collection('bookings')
+  .orderBy('date').orderBy('start')
+  .onSnapshot(snapshot => {
+    bookings = snapshot.docs.map(doc => ({ firestoreId: doc.id, ...doc.data() }));
+    renderRooms();
+    if (document.getElementById('section-status').classList.contains('active')) {
+      renderStatus();
+    }
+  }, err => {
+    console.error('Firestore 오류:', err);
+    showToast('데이터 불러오기 실패', '#b84a36');
+  });
 
 /* =====================
    화면 전환
@@ -55,7 +95,7 @@ function goHome() {
 ===================== */
 function renderCalendar() {
   const today = new Date();
-  today.setHours(0,0,0,0);
+  today.setHours(0, 0, 0, 0);
 
   document.getElementById('calTitle').textContent =
     `${calYear}.${String(calMonth + 1).padStart(2, '0')}`;
@@ -68,18 +108,18 @@ function renderCalendar() {
   for (let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
 
   for (let d = 1; d <= lastDate; d++) {
-    const date = new Date(calYear, calMonth, d);
+    const date    = new Date(calYear, calMonth, d);
     const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dow = date.getDay();
-    const isPast = date < today;
+    const dow     = date.getDay();
+    const isPast  = date < today;
     const isToday = date.getTime() === today.getTime();
-    const isSelected = selectedDate === dateStr;
+    const isSel   = selectedDate === dateStr;
     const holiday = HOLIDAYS[dateStr];
 
     let cls = 'cal-day';
-    if (isPast) cls += ' past';
+    if (isPast)  cls += ' past';
     if (isToday) cls += ' today';
-    if (isSelected) cls += ' selected';
+    if (isSel)   cls += ' selected';
     if (holiday) cls += ' holiday';
     else if (dow === 0) cls += ' sun';
     else if (dow === 6) cls += ' sat';
@@ -95,18 +135,16 @@ function renderCalendar() {
 function selectDate(dateStr) {
   selectedDate = dateStr;
   renderCalendar();
-
   const [y, m, d] = dateStr.split('-');
-  const label = `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`;
   const disp = document.getElementById('selectedDateDisplay');
-  disp.textContent = `📅 ${label} 선택됨`;
+  disp.textContent = `📅 ${y}년 ${parseInt(m)}월 ${parseInt(d)}일 선택됨`;
   disp.classList.add('show');
 }
 
 function changeMonth(dir) {
   calMonth += dir;
-  if (calMonth < 0) { calMonth = 11; calYear--; }
-  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0;  calYear++; }
   renderCalendar();
 }
 
@@ -148,55 +186,57 @@ function switchTab(tab) {
 }
 
 /* =====================
-   예약 제출
+   예약 제출 → Firestore 저장
 ===================== */
-function submitBooking() {
-  const name = document.getElementById('inputName').value.trim();
-  const people = document.getElementById('inputPeople').value;
-  const start = document.getElementById('inputStart').value;
-  const end = document.getElementById('inputEnd').value;
+async function submitBooking() {
+  const name     = document.getElementById('inputName').value.trim();
+  const people   = document.getElementById('inputPeople').value;
+  const start    = document.getElementById('inputStart').value;
+  const end      = document.getElementById('inputEnd').value;
   const password = document.getElementById('inputPassword').value.trim();
 
-  if (!selectedRoom) return showToast('방을 선택해주세요', '#b84a36');
-  if (!selectedDate) return showToast('날짜를 선택해주세요', '#b84a36');
-  if (!name) return showToast('이름을 입력해주세요', '#b84a36');
-  if (!people) return showToast('인원을 선택해주세요', '#b84a36');
-  if (!start || !end) return showToast('시간을 입력해주세요', '#b84a36');
-  if (start >= end) return showToast('종료 시간을 확인해주세요', '#b84a36');
+  if (!selectedRoom)                    return showToast('방을 선택해주세요', '#b84a36');
+  if (!selectedDate)                    return showToast('날짜를 선택해주세요', '#b84a36');
+  if (!name)                            return showToast('이름을 입력해주세요', '#b84a36');
+  if (!people)                          return showToast('인원을 선택해주세요', '#b84a36');
+  if (!start || !end)                   return showToast('시간을 입력해주세요', '#b84a36');
+  if (start >= end)                     return showToast('종료 시간을 확인해주세요', '#b84a36');
   if (!password || password.length < 4) return showToast('비밀번호 4자리를 입력해주세요', '#b84a36');
 
   const conflict = bookings.find(b =>
     b.roomId === selectedRoom &&
-    b.date === selectedDate &&
+    b.date   === selectedDate &&
     !(end <= b.start || start >= b.end)
   );
-  if (conflict) return showToast(`${ROOMS[selectedRoom-1].name}은 해당 시간에 이미 예약이 있어요`, '#c8762a');
+  if (conflict) return showToast(
+    `${ROOMS.find(r => r.id === selectedRoom).name}은 해당 시간에 이미 예약이 있어요`, '#c8762a'
+  );
 
-  const booking = {
-    id: Date.now(),
-    roomId: selectedRoom,
-    date: selectedDate,
-    name,
-    people,
-    start,
-    end,
-    password,
-    createdAt: new Date().toISOString()
-  };
-  bookings.push(booking);
-  localStorage.setItem('bookings', JSON.stringify(bookings));
+  try {
+    const savedDate = selectedDate;
+    const savedRoom = ROOMS.find(r => r.id === selectedRoom);
 
-  selectedRoom = null;
-  selectedDate = null;
-  document.getElementById('inputName').value = '';
-  document.getElementById('inputPeople').value = '';
-  document.getElementById('inputPassword').value = '';
-  document.getElementById('selectedDateDisplay').classList.remove('show');
-  renderCalendar();
-  renderRooms();
+    await db.collection('bookings').add({
+      roomId: selectedRoom,
+      date:   selectedDate,
+      name, people, start, end, password,
+      createdAt: new Date().toISOString()
+    });
 
-  const [y, m, d] = booking.date.split('-');
-  showToast(`예약 완료! ${ROOMS[booking.roomId-1].name} ${parseInt(m)}/${parseInt(d)} ${start}~${end}`, '#4a8c4a');
+    selectedRoom = null;
+    selectedDate = null;
+    document.getElementById('inputName').value     = '';
+    document.getElementById('inputPeople').value   = '';
+    document.getElementById('inputPassword').value = '';
+    document.getElementById('selectedDateDisplay').classList.remove('show');
+    renderCalendar();
+
+    const [y, m, d] = savedDate.split('-');
+    showToast(`예약 완료! ${savedRoom.name} ${parseInt(m)}/${parseInt(d)} ${start}~${end}`, '#4a8c4a');
+  } catch (e) {
+    console.error(e);
+    showToast('예약 저장 실패. 다시 시도해주세요', '#b84a36');
+  }
 }
 
 /* =====================
@@ -204,7 +244,9 @@ function submitBooking() {
 ===================== */
 function renderStatus() {
   const list = document.getElementById('bookingList');
-  const filtered = filterRoom === 'all' ? bookings : bookings.filter(b => b.roomId === parseInt(filterRoom));
+  const filtered = filterRoom === 'all'
+    ? bookings
+    : bookings.filter(b => b.roomId === parseInt(filterRoom));
   const sorted = [...filtered].sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
     return a.start.localeCompare(b.start);
@@ -212,7 +254,6 @@ function renderStatus() {
 
   document.getElementById('totalCount').textContent = bookings.length;
 
-  // 필터 버튼
   const filterEl = document.getElementById('roomFilter');
   filterEl.innerHTML = `
     <button class="filter-btn ${filterRoom === 'all' ? 'active' : ''}" onclick="setFilter('all')">전체 (${bookings.length})</button>
@@ -233,8 +274,11 @@ function renderStatus() {
 
   list.innerHTML = sorted.map(b => {
     const room = ROOMS.find(r => r.id === b.roomId);
+    if (!room) return '';
     const peopleLabel = b.people === '5' ? '5명 이상' : b.people + '명';
-    const dateLabel = b.date ? (() => { const [y,m,d] = b.date.split('-'); return `${parseInt(m)}/${parseInt(d)}`; })() : '';
+    const dateLabel = b.date
+      ? (() => { const [y,m,d] = b.date.split('-'); return `${parseInt(m)}/${parseInt(d)}`; })()
+      : '';
     return `
       <div class="booking-item">
         <div class="booking-dot" style="background:${room.color}"></div>
@@ -249,7 +293,7 @@ function renderStatus() {
             <span>👥 ${peopleLabel}</span>
           </div>
         </div>
-        <button class="booking-delete" onclick="deleteBooking(${b.id})" title="삭제">✕</button>
+        <button class="booking-delete" onclick="deleteBooking('${b.firestoreId}', '${b.password}')" title="삭제">✕</button>
       </div>
     `;
   }).join('');
@@ -263,8 +307,9 @@ function setFilter(val) {
 /* =====================
    예약 삭제 (비밀번호 확인)
 ===================== */
-function deleteBooking(id) {
-  deleteTargetId = id;
+function deleteBooking(firestoreId, pw) {
+  deleteTargetId = firestoreId;
+  deleteTargetPw = pw;
   document.getElementById('modalPassword').value = '';
   document.getElementById('modalOverlay').classList.add('show');
   setTimeout(() => document.getElementById('modalPassword').focus(), 100);
@@ -273,14 +318,13 @@ function deleteBooking(id) {
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('show');
   deleteTargetId = null;
+  deleteTargetPw = '';
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   const input = document.getElementById('modalPassword').value.trim();
-  const target = bookings.find(b => b.id === deleteTargetId);
-  if (!target) return closeModal();
 
-  if (input !== target.password && input !== MASTER_PASSWORD) {
+  if (input !== deleteTargetPw && input !== MASTER_PASSWORD) {
     document.getElementById('modalPassword').value = '';
     document.getElementById('modalPassword').style.borderColor = '#b84a36';
     setTimeout(() => document.getElementById('modalPassword').style.borderColor = '', 1000);
@@ -288,27 +332,31 @@ function confirmDelete() {
     return;
   }
 
-  bookings = bookings.filter(b => b.id !== deleteTargetId);
-  localStorage.setItem('bookings', JSON.stringify(bookings));
-  closeModal();
-  renderRooms();
-  renderStatus();
-  showToast('예약이 취소됐어요', '#c8762a');
+  try {
+    await db.collection('bookings').doc(deleteTargetId).delete();
+    closeModal();
+    showToast('예약이 취소됐어요', '#c8762a');
+  } catch (e) {
+    console.error(e);
+    showToast('삭제 실패. 다시 시도해주세요', '#b84a36');
+  }
 }
 
 /* =====================
    토스트
 ===================== */
-function showToast(msg, color = '#4ade80') {
+function showToast(msg, color = '#4a8c4a') {
   const t = document.getElementById('toast');
-  t.textContent = msg;
+  t.textContent      = msg;
   t.style.background = color;
-  t.style.color = color === '#4ade80' ? '#000' : '#fff';
+  t.style.color      = '#fff';
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2800);
 }
 
-// 초기 실행
+/* =====================
+   초기 실행
+===================== */
 renderRooms();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js');
