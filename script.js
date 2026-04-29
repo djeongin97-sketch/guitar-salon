@@ -360,11 +360,9 @@ function renderStatus() {
   document.getElementById('totalCount').textContent = bookings.length;
   document.getElementById('weekLabel').textContent = formatWeekLabel(weekStart);
 
-  // 이전 주 버튼 활성/비활성 (오늘이 포함된 주보다 이전은 막기)
-  const thisWeekStart = getWeekStart(new Date());
-  document.getElementById('btnPrevWeek').style.opacity =
-    weekStart <= thisWeekStart ? '0.3' : '1';
-  document.getElementById('btnPrevWeek').disabled = weekStart <= thisWeekStart;
+  // 이전 주 버튼 항상 활성화 (과거 예약도 볼 수 있게 변경)
+  document.getElementById('btnPrevWeek').style.opacity = '1';
+  document.getElementById('btnPrevWeek').disabled = false;
 
   // 방 필터 버튼
   const filterEl = document.getElementById('roomFilter');
