@@ -407,12 +407,18 @@ function renderStatus() {
           const room = ROOMS.find(r => r.id === b.roomId);
           if (!room) return '';
           const peopleLabel = b.people === '5' ? '5명 이상' : b.people + '명';
+          // 👇 현재 시간과 예약 종료 시간을 비교하는 로직 추가
+          const endDateTime = new Date(`${b.date}T${b.end}:00`);
+          const now = new Date();
+          const isPast = endDateTime < now; // 예약 종료 시간이 현재보다 과거인지 확인
+          const pastClass = isPast ? 'past' : ''; // 과거면 'past' 클래스 추가
+          const endBadge = isPast ? `<span style="font-size:11px; font-weight:normal; color:#888; margin-left:4px;">(종료)</span>` : '';
           return `
-            <div class="booking-item">
+           <div class="booking-item ${pastClass}">
               <div class="booking-dot" style="background:${room.color}"></div>
               <div class="booking-info">
                 <div class="booking-top">
-                  <div class="booking-name">${b.name}${b.practiceType ? ` <span style="font-size:12px; font-weight:500; color:var(--accent);">[${b.practiceType}]</span>` : ''}</div>
+                  <div class="booking-name">${b.name}${b.practiceType ? ` <span style="font-size:12px; font-weight:500; color:var(--accent);">[${b.practiceType}]</span>` : ''}${endBadge}</div>
                   <div class="booking-room">${room.name}</div>
                 </div>
                 <div class="booking-meta">

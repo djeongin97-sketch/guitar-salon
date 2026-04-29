@@ -713,3 +713,18 @@ select option { background: var(--surface2); }
   color: var(--text-dim);
   font-family: 'DM Mono', monospace;
 }
+
+/* =====================
+   종료된 예약 스타일
+===================== */
+.booking-item.past {
+  opacity: 0.4; /* 전체를 반투명하게 만듭니다 */
+  background: var(--surface2); /* 배경색을 살짝 어둡게 */
+  border-color: #d6cab8;
+}
+.booking-item.past .booking-dot {
+  background: #a69c8f !important; /* 방 색상 동그라미를 회색으로 변경 */
+}
+.booking-item.past .booking-delete {
+  display: none; /* 끝난 예약은 X(삭제) 버튼 숨기기 (선택 사항) */
+}
