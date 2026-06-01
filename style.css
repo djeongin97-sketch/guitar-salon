@@ -120,6 +120,13 @@ main {
   flex-shrink: 0;
 }
 .room-info { flex: 1; }
+.room-notice {
+  font-size: 10px;
+  color: var(--warn);
+  margin-top: 3px;
+  font-weight: 500;
+}
+
 .room-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
 .room-count { font-size: 11px; color: var(--text-dim); font-family: 'DM Mono', monospace; }
 .room-badge {

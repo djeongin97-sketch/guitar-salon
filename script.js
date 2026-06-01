@@ -155,12 +155,19 @@ function changeMonth(dir) {
 ===================== */
 function renderRooms() {
   const grid = document.getElementById('roomGrid');
+  const dateToCheck = selectedDate || toLocalDateStr(new Date());
+  const selectedDow = new Date(dateToCheck + 'T12:00:00').getDay();
+  const isFriday = selectedDow === 5;
+
   grid.innerHTML = ROOMS.map(r => {
-    const dateToCheck = selectedDate || new Date().toISOString().slice(0, 10);
-    
     // 해당 날짜, 해당 방의 전체 인원수 합산
     const roomBookings = bookings.filter(b => b.roomId === r.id && b.date === dateToCheck);
     const totalPeople = roomBookings.reduce((sum, b) => sum + parseInt(b.people || 0), 0);
+
+    // 금요일 거실 안내
+    const fridayNotice = (isFriday && r.id === 1)
+      ? `<div class="room-notice">⚠️ 8~9시 수업으로 해당 시간 예약 불가</div>`
+      : '';
 
     const isSelected = selectedRoom === r.id;
     const clickHandler = `onclick="selectRoom(${r.id})"`;
@@ -172,6 +179,7 @@ function renderRooms() {
         <div class="room-info">
           <div class="room-name">${r.name}</div>
           <div class="room-count">오늘 총 ${totalPeople}명 예약 · ${r.desc}</div>
+          ${fridayNotice}
         </div>
         <div class="room-badge badge-available">예약 가능</div>
       </div>
@@ -267,6 +275,25 @@ async function submitBooking() {
   if (!start || !end)                   return showToast('시간을 입력해주세요', '#b84a36');
   if (start >= end)                     return showToast('종료 시간을 확인해주세요', '#b84a36');
   if (!password || password.length < 4) return showToast('비밀번호 4자리를 입력해주세요', '#b84a36');
+
+  // 금요일 수업 시간 제한 체크
+  const selectedDow = new Date(selectedDate + 'T12:00:00').getDay(); // 5 = 금요일
+  const isFriday = selectedDow === 5;
+  if (isFriday) {
+    // 거실(id:1)은 08:00~09:00 시간대 예약 불가
+    if (selectedRoom === 1) {
+      const classStart = '08:00';
+      const classEnd   = '09:00';
+      const overlapsClass = !(end <= classStart || start >= classEnd);
+      if (overlapsClass) {
+        return showToast('금요일 8~9시는 수업 시간이라 거실 예약이 불가해요', '#b84a36');
+      }
+    }
+    // 모든 방 08:00 이후 시작 불가 (입장 시간 제한)
+    if (start >= '08:00' && start < '09:00') {
+      return showToast('금요일 수업 중(8~9시)에는 입장할 수 없어요', '#b84a36');
+    }
+  }
 
   // --- [핵심 로직] 예약하려는 시간과 겹치는 기존 예약들의 인원수 합산 ---
   const r = ROOMS.find(r => r.id === selectedRoom);
