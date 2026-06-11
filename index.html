@@ -17,8 +17,7 @@
     </div>
     <div class="home-sub">연습실을 예약하고<br>현황을 확인하세요</div>
     <div class="home-buttons">
-      <button class="btn-home-primary" onclick="goToApp('book')">예약하기</button>
-      <button class="btn-home-secondary" onclick="goToApp('status')">예약 현황 보기</button>
+      <button class="btn-home-primary" onclick="goToApp('status')">예약하기</button>
     </div>
     <div class="home-date" id="homeDate"></div>
   </div>
@@ -33,88 +32,83 @@
     </header>
 
     <main>
-      <div class="tabs">
-        <button class="tab active" onclick="switchTab('book')">예약하기</button>
-        <button class="tab" onclick="switchTab('status')">예약 현황</button>
+
+      <!-- 예약 현황 (항상 보임) -->
+      <div class="status-header">
+        <div class="status-title">예약 현황</div>
+        <div class="total-badge">총 <b id="totalCount">0</b>팀</div>
+      </div>
+      <div class="week-nav">
+        <button class="week-btn" id="btnPrevWeek" onclick="changeWeek(-1)">‹</button>
+        <span class="week-label" id="weekLabel"></span>
+        <button class="week-btn" onclick="changeWeek(1)">›</button>
+      </div>
+      <div class="room-filter" id="roomFilter"></div>
+      <div class="booking-list" id="bookingList"></div>
+
+      <!-- 예약 폼 -->
+      <div class="divider" style="margin: 24px 0 0;"></div>
+      <div class="book-section-title">
+        <span>➕ 예약하기</span>
       </div>
 
-      <!-- 예약하기 -->
-      <div class="section active" id="section-book">
-
-        <div class="form-group">
-          <label>날짜 선택</label>
-          <div class="calendar-wrap">
-            <div class="cal-header">
-              <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
-              <span class="cal-title" id="calTitle"></span>
-              <button class="cal-nav" onclick="changeMonth(1)">›</button>
-            </div>
-            <div class="cal-weekdays">
-              <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
-            </div>
-            <div class="cal-grid" id="calGrid"></div>
+      <div class="form-group">
+        <label>날짜 선택</label>
+        <div class="calendar-wrap">
+          <div class="cal-header">
+            <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+            <span class="cal-title" id="calTitle"></span>
+            <button class="cal-nav" onclick="changeMonth(1)">›</button>
           </div>
-          <div class="selected-date-display" id="selectedDateDisplay"></div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="section-label">방 선택</div>
-        <div class="room-grid" id="roomGrid"></div>
-        <div class="divider"></div>
-
-        <div class="form-group">
-          <label>사용 시간</label>
-          <div class="time-row">
-            <input type="time" id="inputStart" value="10:00">
-            <span class="time-sep">—</span>
-            <input type="time" id="inputEnd" value="11:00">
+          <div class="cal-weekdays">
+            <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
           </div>
+          <div class="cal-grid" id="calGrid"></div>
         </div>
-
-        <div class="form-group" id="typeGroup" style="display: none;">
-          <label>예약 유형</label>
-          <select id="inputType" onchange="handleTypeChange()">
-            <option value="팀">팀 연습</option>
-            <option value="개인">개인 연습</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>이름</label>
-          <input type="text" id="inputName" placeholder="이름을 입력하세요">
-        </div>
-
-        <div class="form-group">
-          <label>사용 인원</label>
-          <select id="inputPeople">
-            <option value="">방을 먼저 선택해주세요</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>예약 비밀번호 <span style="color:var(--text-dim);font-size:11px;text-transform:none;letter-spacing:0">(취소할 때 필요해요)</span></label>
-          <input type="password" id="inputPassword" placeholder="숫자 4자리" maxlength="4" inputmode="numeric">
-        </div>
-
-        <button class="btn-primary" onclick="submitBooking()">예약하기</button>
+        <div class="selected-date-display" id="selectedDateDisplay"></div>
       </div>
 
-      <!-- 예약 현황 -->
-      <div class="section" id="section-status">
-        <div class="status-header">
-          <div class="status-title">예약 현황</div>
-          <div class="total-badge">선택일 총 <b id="totalCount">0</b>명</div>
+      <div class="divider"></div>
+
+      <div class="section-label">방 선택</div>
+      <div class="room-grid" id="roomGrid"></div>
+      <div class="divider"></div>
+
+      <div class="form-group">
+        <label>사용 시간</label>
+        <div class="time-row">
+          <input type="time" id="inputStart" value="10:00">
+          <span class="time-sep">—</span>
+          <input type="time" id="inputEnd" value="11:00">
         </div>
-        <!-- 주간 네비게이션 -->
-        <div class="week-nav">
-          <button class="week-btn" id="btnPrevWeek" onclick="changeWeek(-1)">‹</button>
-          <span class="week-label" id="weekLabel"></span>
-          <button class="week-btn" onclick="changeWeek(1)">›</button>
-        </div>
-        <div class="room-filter" id="roomFilter"></div>
-        <div class="booking-list" id="bookingList"></div>
       </div>
+
+      <div class="form-group" id="typeGroup" style="display: none;">
+        <label>예약 유형</label>
+        <select id="inputType" onchange="handleTypeChange()">
+          <option value="팀">팀 연습</option>
+          <option value="개인">개인 연습</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>이름</label>
+        <input type="text" id="inputName" placeholder="이름을 입력하세요">
+      </div>
+
+      <div class="form-group">
+        <label>사용 인원</label>
+        <select id="inputPeople">
+          <option value="">방을 먼저 선택해주세요</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>예약 비밀번호 <span style="color:var(--text-dim);font-size:11px;text-transform:none;letter-spacing:0">(취소할 때 필요해요)</span></label>
+        <input type="password" id="inputPassword" placeholder="숫자 4자리" maxlength="4" inputmode="numeric">
+      </div>
+
+      <button class="btn-primary" onclick="submitBooking()">예약하기</button>
 
     </main>
   </div><!-- /screen-app -->

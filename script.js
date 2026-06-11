@@ -78,11 +78,12 @@ db.collection('bookings')
 /* =====================
    화면 전환
 ===================== */
-function goToApp(tab) {
+function goToApp() {
   document.getElementById('screen-home').style.display = 'none';
   document.getElementById('screen-app').classList.add('active');
-  switchTab(tab);
+  renderStatus();
   renderCalendar();
+  renderRooms();
 }
 
 function goHome() {
